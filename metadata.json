@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Barcode Battler",
+  "description": "An application that allows users to generate character images from a number and a text prompt using the Gemini 2.5 Flash Image model. Enter a number to seed the character's stats, provide a description, and let Gemini bring your character to life.",
+  "requestFramePermissions": []
+}
