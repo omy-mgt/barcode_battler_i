@@ -11,6 +11,7 @@
 
 2.  **エラーメッセージからの根本原因の特定:**
     *   `HUGGING_FACE_API_KEY is not set`: 環境変数の設定不備が原因であると特定し、Git管理外の `.env` ファイルの作成を提案しました。
+    *   `GOOGLE_API_KEY is not set`: Google APIキーも同様に、環境変数の設定不備が原因であると特定し、Git管理外の `.env` ファイルの作成を提案しました。
     *   `Can't enumerate devices`: スマートフォンでのみ発生したこのエラーと `BarcodeScanner.tsx` の存在から、カメラ機能にはHTTPS接続が必須であると推論し、開発サーバーのHTTPS化を提案しました。
     *   `Cannot find package '@vitejs/plugin-basic-ssl'`: `npm install` をしても発生したこのエラーに対し、`npm install` の出力が `up to date` であったことから、`package.json` に依存関係が記録されていないことが真の原因であると突き止めました。
 
