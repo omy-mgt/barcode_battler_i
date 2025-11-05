@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.28.0",
     "@huggingface/inference": "^4.13.0",
     "@zxing/library": "^0.21.3",
     "buffer": "^6.0.3",

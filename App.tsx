@@ -1,44 +1,82 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
 import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { BarcodeScanner } from './components/BarcodeScanner'; // Import the scanner
+import { BarcodeScanner } from './components/BarcodeScanner';
 import { generateImage } from './services/huggingFaceService';
+import { generateCreatureInfo } from './services/geminiService';
+import { CreatureData } from './types';
 
 const App: React.FC = () => {
   const [inputNumber, setInputNumber] = useState<string>('');
   const [prompt, setPrompt] = useState<string>('');
+  const [creatureData, setCreatureData] = useState<CreatureData | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingStep, setLoadingStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [isScannerOpen, setScannerOpen] = useState<boolean>(false); // State for scanner modal
+  const [isScannerOpen, setScannerOpen] = useState<boolean>(false);
 
-  const handleGenerateClick = useCallback(async () => {
-    if (!inputNumber || !prompt) {
-      setError('Please enter a number and a description.');
-      return;
-    }
-    
-    const num = parseInt(inputNumber, 10);
-    if (isNaN(num) || !Number.isFinite(num)) {
-        setError('Please enter a valid number.');
+  // Automatically generate settings when inputNumber changes (with debounce)
+  useEffect(() => {
+    const handler = setTimeout(async () => {
+      if (!inputNumber) {
+        setPrompt('');
+        setCreatureData(null);
         return;
+      }
+      const num = parseInt(inputNumber, 10);
+      if (isNaN(num) || !Number.isFinite(num)) {
+          return; // Don't trigger for invalid numbers
+      }
+
+      setIsLoading(true);
+      setLoadingStep('Generating creature settings...');
+      setError(null);
+      setCreatureData(null);
+      setGeneratedImageUrl(null);
+
+      try {
+        const data = await generateCreatureInfo(inputNumber);
+        setCreatureData(data);
+        setPrompt(data.description);
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      } finally {
+        setIsLoading(false);
+        setLoadingStep('');
+      }
+    }, 500); // 500ms debounce
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [inputNumber]);
+
+  const formatPrompt = useCallback((data: CreatureData, userPrompt: string): string => {
+    const borderStyle = "Ornate, intricate, metallic fantasy frame";
+    return `Fantasy trading card of a ${userPrompt}.
+Rarity: ${data.rarity}.
+Stats display: HP ${data.hp}, ATK ${data.atk}, DEF ${data.def}.
+${borderStyle}.
+High detail, dynamic lighting, vibrant colors, 4K quality.`;
+  }, []);
+
+  const handleGenerateImage = useCallback(async () => {
+    if (!prompt || !creatureData) {
+      setError('Please enter a number to generate settings, and provide a description.');
+      return;
     }
 
     setIsLoading(true);
+    setLoadingStep('Generating final image...');
     setError(null);
     setGeneratedImageUrl(null);
 
     try {
-      // Generate some stats from the number, inspired by Barcode Battler.
-      const s = inputNumber.padStart(9, '0');
-      const hp = parseInt(s.slice(0, 3), 10) * (10 + (num % 5));
-      const attack = parseInt(s.slice(3, 6), 10) * (1 + (num % 3));
-      const defense = parseInt(s.slice(6, 9), 10) * (1 + (num % 4));
-
-      const finalPrompt = `Generate a fantasy character based on the following:\nDescription: "${prompt}".\nThis character is a powerful being derived from a unique numerical signature.\nBase stats:\n- HP: ${hp}\n- Attack: ${attack}\n- Defense: ${defense}\nThe visual design should reflect these stats. A high HP character might be large and sturdy, while a high attack character could have prominent weapons or energy auras. The art style should be detailed digital painting, suitable for a fantasy game.`;
-
+      const finalPrompt = formatPrompt(creatureData, prompt);
       const newImageBase64 = await generateImage(finalPrompt);
       setGeneratedImageUrl(newImageBase64);
     } catch (err) {
@@ -46,10 +84,10 @@ const App: React.FC = () => {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
+      setLoadingStep('');
     }
-  }, [inputNumber, prompt]);
+  }, [prompt, creatureData, formatPrompt]);
 
-  // Handler for when the scanner gets a result
   const handleScan = (result: string) => {
     setInputNumber(result);
     setScannerOpen(false);
@@ -58,7 +96,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       <Header />
-      {isLoading && <LoadingOverlay />}
+      {isLoading && <LoadingOverlay text={loadingStep} />}
       {isScannerOpen && <BarcodeScanner onScan={handleScan} onClose={() => setScannerOpen(false)} />}
 
       <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col items-center">
@@ -87,14 +125,14 @@ const App: React.FC = () => {
             <PromptInput prompt={prompt} setPrompt={setPrompt} />
             
             <button
-              onClick={handleGenerateClick}
-              disabled={!inputNumber || !prompt || isLoading}
+              onClick={handleGenerateImage}
+              disabled={!prompt || !creatureData || isLoading}
               className="mt-4 w-full flex items-center justify-center gap-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg text-lg transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-lg shadow-cyan-600/30"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
-              Generate
+              Generate Image
             </button>
           </div>
 
@@ -106,7 +144,7 @@ const App: React.FC = () => {
         </div>
       </main>
       <footer className="text-center p-4 text-slate-500 text-sm">
-        Powered by Hugging Face
+        Powered by Hugging Face & Gemini
       </footer>
     </div>
   );
